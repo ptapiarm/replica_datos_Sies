@@ -319,6 +319,24 @@ const DATA = {"inst": [{"c": "1", "n": "UNIVERSIDAD GABRIELA MISTRAL", "t": "Uni
   // grupo de referencia propio: mismos años de acreditación, sin la institución
   const grupoPropio = (d) => claveAcr(d);
 
+  // ---------- sigla de la institución (para "sin UAH")
+  const SIGLAS = { '69': 'UAH', '70': 'UCH', '86': 'UC', '71': 'USACH', '88': 'USM', '89': 'PUCV', '85': 'UTEM', '87': 'UdeC',
+    '20': 'UNAB', '3': 'UDP', '23': 'UAI', '45': 'UDD', '34': 'UANDES', '39': 'USS', '13': 'UST', '19': 'UDLA', '90': 'UACh',
+    '93': 'UCSC', '94': 'UCT', '92': 'UCM', '91': 'UCN', '42': 'UCSH', '76': 'UFRO', '78': 'UTalca', '72': 'UV', '83': 'UPLA',
+    '81': 'UNAP', '4': 'UCEN', '74': 'ULS', '75': 'UBB', '80': 'UTA', '84': 'ULagos', '77': 'UMAG', '79': 'UDA', '82': 'UMCE',
+    '895': 'UOH', '896': 'UAysén', '10': 'UMayor', '2': 'UFT', '1': 'UGM', '31': 'UAutónoma', '73': 'UA', '22': 'UVM', '9': 'UDALBA' };
+  const VACIAS = new Set(['DE', 'DEL', 'LA', 'LAS', 'LOS', 'EL', 'Y', 'E']);
+  function sigla(d) {
+    if (SIGLAS[d.c]) return SIGLAS[d.c];
+    let n = d.n.toUpperCase();
+    if (n.includes(' - ')) return n.split(' - ').pop().trim();          // "IP LATINOAMERICANO ... - IPLACEX"
+    const pref = n.match(/^(IP|CFT) (.+)$/);
+    if (pref) { const resto = pref[2].split(/\s+/); if (resto.length === 1) return resto[0]; n = pref[2]; }
+    const palabras = n.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z ]/g, ' ').split(/\s+/).filter((w) => w && !VACIAS.has(w));
+    if (palabras.length === 1) return palabras[0];                      // "CFT DE ENAC" -> ENAC
+    return (pref ? pref[1] + ' ' : '') + palabras.map((w) => w[0]).join('');
+  }
+
   // ---------- render
   function render() {
     const d = byCod.get(cod);
@@ -354,7 +372,7 @@ const DATA = {"inst": [{"c": "1", "n": "UNIVERSIDAD GABRIELA MISTRAL", "t": "Uni
     $('k-cam-n').textContent = prev == null ? 'Sin dato publicable en ' + prevA : 'Cohorte ' + prevA + ': ' + pct(prev);
     $('k-dif-k').textContent = 'Diferencia vs ' + nombreG;
     $('k-dif').textContent = pp(dif); tono($('k-dif'), dif);
-    $('k-dif-n').textContent = 'Promedio sin esta institución: ' + pct(rg);
+    $('k-dif-n').textContent = 'Promedio sin ' + sigla(d) + ': ' + pct(rg);
     $('k-pos').textContent = n ? pos + '° de ' + n : '—';
     $('k-pos-n').textContent = 'Entre ' + tipoCorto(d.t) + ' con dato en ' + u;
 
@@ -366,7 +384,7 @@ const DATA = {"inst": [{"c": "1", "n": "UNIVERSIDAD GABRIELA MISTRAL", "t": "Uni
     años.slice().reverse().forEach((a) => selA.appendChild(new Option('Cohorte ' + a, a)));
     selA.value = anioRank || u;
 
-    $('th-grupo').textContent = cap(nombreG) + ' (sin esta institución)';
+    $('th-grupo').textContent = cap(nombreG) + ' (sin ' + sigla(d) + ')';
     $('nota-tabla').textContent = 'La barra muestra la retención; la marca negra, el promedio de las demás ' + nombreG + ' en esa cohorte.';
 
     dibujarChips(); dibujarLinea(); dibujarRanking(); dibujarTabla();
@@ -395,7 +413,7 @@ const DATA = {"inst": [{"c": "1", "n": "UNIVERSIDAD GABRIELA MISTRAL", "t": "Uni
       const ms = miembros(k, d.t, d.c).filter((m) => ret(m, anios[anios.length - 1]) != null);
       const excl = claveAcr(d) === k;
       const txt = k === 'sin' ? 'Sin acreditación' : `${k} años`;
-      cont.appendChild(chip(k, txt, `${ms.length} inst.${excl ? ', sin esta' : ''}`, activos.has(k), false));
+      cont.appendChild(chip(k, txt, `${ms.length} inst.${excl ? ', sin ' + sigla(d) : ''}`, activos.has(k), false));
     });
     cont.appendChild(chip('tipo', 'Todas las ' + tipoCorto(d.t), '', activos.has('tipo'), false));
     cont.appendChild(chip('sis', 'Total sistema', '', activos.has('sis'), false));
@@ -412,7 +430,7 @@ const DATA = {"inst": [{"c": "1", "n": "UNIVERSIDAD GABRIELA MISTRAL", "t": "Uni
     series.push({ key: 'inst', nombre: d.n, pts: anios.map((a) => ({ a, v: ret(d, a) })), ancho: 3, dash: TRAZO.inst });
     gruposDisponibles(d.t).concat(['tipo']).forEach((k) => {
       if (!activos.has(k)) return;
-      const nombre = k === 'tipo' ? 'Todas las ' + tipoCorto(d.t) : nombreGrupo(k, d.t) + (claveAcr(d) === k ? ' (sin esta)' : '');
+      const nombre = k === 'tipo' ? 'Todas las ' + tipoCorto(d.t) : nombreGrupo(k, d.t) + (claveAcr(d) === k ? ' (sin ' + sigla(d) + ')' : '');
       series.push({ key: k, nombre, pts: serieGrupo(k, d.t, d.c).filter((p) => +p.a >= DESDE_GRAFICO).map((p) => ({ a: p.a, v: p.v })), ancho: 2, dash: TRAZO[k] || '' });
     });
     if (activos.has('sis')) series.push({ key: 'sis', nombre: 'Total sistema', pts: anios.map((a) => ({ a, v: DATA.ref['Total sistema'][a] ?? null })), ancho: 1.5, dash: TRAZO.sis });
